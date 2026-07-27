@@ -26,6 +26,11 @@ a night road, dunes and finally the sierra.
 
 Reaching a checkpoint adds time. Nothing else does.
 
+The split is announced before it happens — a chevron board on the nose of the
+island, and `LEFT` / `RIGHT` on screen. As the two carriageways part, the
+island between them is real ground: drive onto it and you are off the road
+like anywhere else.
+
 ## Controls
 
 `←` `→` steer, `↑` accelerate, `↓` brake, `SPACE` shifts between the low and
@@ -33,8 +38,14 @@ high gear, `P` pauses. `M` toggles sound, `L` cycles the language and `N`
 changes your name.
 
 Low gear pulls harder and tops out early; high gear is slower off the mark and
-much faster once it is running. Going off the tarmac scrubs your speed, and a
-bend throws you outward the faster you take it.
+much faster once it is running. A bend throws you outward the faster you take
+it.
+
+Anything that costs you speed says so. Hit traffic and the car slews, smokes
+its tyres, shakes the screen and drops to roughly the pace of the car you hit
+— never to a standstill — and `CRASH!` appears. Put two wheels in the sand and
+you get `OFF THE ROAD!` and a dust trail. Traffic you are catching lights its
+brake lights while it is still far enough away to go around.
 
 **Touch** — no on-screen buttons. The left half of the screen steers: drag left
 or right. The right half is the pedals: hold to accelerate, and slide the same

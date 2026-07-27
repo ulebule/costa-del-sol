@@ -129,6 +129,7 @@ const STR={
       go:'GO!',ready:'GET READY',timeup:'TIME UP',
       goal:'GOAL!',finish:'YOU MADE IT TO',again:'PRESS ENTER TO DRIVE AGAIN',
       pause:'PAUSED',fork:'CHOOSE YOUR ROAD',
+      bump:'CRASH!',dirt:'OFF THE ROAD!',keepleft:'LEFT',keepright:'RIGHT',
       sending:'SENDING…',sent:'SAVED ONLINE!',failed:'OFFLINE — SAVED LOCALLY',
       offline:'OFFLINE — LOCAL SCORES ONLY',loading:'LOADING BOARD…',newrec:'NEW RECORD!',
       rotate:'TURN THE PHONE SIDEWAYS',route:'ROUTE'},
@@ -142,6 +143,7 @@ const STR={
       go:'ZDAJ!',ready:'PRIPRAVI SE',timeup:'ČAS POTEKEL',
       goal:'CILJ!',finish:'PRIPELJAL SI V',again:'PRITISNI ENTER ZA NOVO VOŽNJO',
       pause:'PAVZA',fork:'IZBERI CESTO',
+      bump:'TRČENJE!',dirt:'ZAPELJAL S CESTE!',keepleft:'LEVO',keepright:'DESNO',
       sending:'POŠILJAM…',sent:'SHRANJENO NA SPLETU!',failed:'BREZ POVEZAVE — SHRANJENO LOKALNO',
       offline:'BREZ POVEZAVE — LE LOKALNI REZULTATI',loading:'NALAGAM LESTVICO…',newrec:'NOV REKORD!',
       rotate:'OBRNI TELEFON POLEŽE',route:'POT'},
@@ -155,6 +157,7 @@ const STR={
       go:'LOS!',ready:'BEREIT MACHEN',timeup:'ZEIT UM',
       goal:'ZIEL!',finish:'DU KAMST NACH',again:'ENTER FÜR EINE NEUE FAHRT',
       pause:'PAUSE',fork:'WÄHLE DEINE STRASSE',
+      bump:'CRASH!',dirt:'NEBEN DER STRASSE!',keepleft:'LINKS',keepright:'RECHTS',
       sending:'SENDE…',sent:'ONLINE GESPEICHERT!',failed:'OFFLINE — LOKAL GESPEICHERT',
       offline:'OFFLINE — NUR LOKALE PUNKTE',loading:'LADE BESTENLISTE…',newrec:'NEUER REKORD!',
       rotate:'DAS HANDY QUER DREHEN',route:'ROUTE'},
@@ -168,6 +171,7 @@ const STR={
       go:'VIA!',ready:'PREPARATI',timeup:'TEMPO SCADUTO',
       goal:'TRAGUARDO!',finish:'SEI ARRIVATO A',again:'PREMI INVIO PER RIGUIDARE',
       pause:'PAUSA',fork:'SCEGLI LA STRADA',
+      bump:'SCONTRO!',dirt:'FUORI STRADA!',keepleft:'SIN.',keepright:'DES.',
       sending:'INVIO…',sent:'SALVATO ONLINE!',failed:'OFFLINE — SALVATO IN LOCALE',
       offline:'OFFLINE — SOLO PUNTEGGI LOCALI',loading:'CARICO LA CLASSIFICA…',newrec:'NUOVO RECORD!',
       rotate:'GIRA IL TELEFONO DI LATO',route:'PERCORSO'},
@@ -181,6 +185,7 @@ const STR={
       go:'GO !',ready:'PRÊT',timeup:'TEMPS ÉCOULÉ',
       goal:'ARRIVÉE !',finish:'TU ES ARRIVÉ À',again:'ENTRÉE POUR REPARTIR',
       pause:'PAUSE',fork:'CHOISIS TA ROUTE',
+      bump:'CHOC !',dirt:'HORS DE LA ROUTE !',keepleft:'GAUCHE',keepright:'DROITE',
       sending:'ENVOI…',sent:'ENREGISTRÉ EN LIGNE !',failed:'HORS LIGNE — ENREGISTRÉ EN LOCAL',
       offline:'HORS LIGNE — SCORES LOCAUX',loading:'CHARGEMENT DU CLASSEMENT…',newrec:'NOUVEAU RECORD !',
       rotate:'TOURNE LE TÉLÉPHONE',route:'ROUTE'}
@@ -350,7 +355,7 @@ function buildStage(row,pos){
   const hard=0.4+row*0.22;
   let y=0;
   const total=560+row*40;
-  forkAt=total-90;
+  forkAt=total-170;
   function push(curve,dy){
     const n=segs.length;
     segs.push({i:n, curve, p1:{world:{y:y,z:n*SEG}}, p2:{world:{y:y+dy,z:(n+1)*SEG}},
@@ -376,25 +381,47 @@ function buildStage(row,pos){
   while(segs.length<total){
     const k=(segs.length-forkAt)/(total-forkAt);
     push(0,0);
-    segs[segs.length-1].fork=Math.min(1,k*1.6);
+    segs[segs.length-1].fork=Math.min(1,k*1.5);
   }
+  /* the sign board that stands on the nose of the island, so the split is
+     announced by the scenery and not only by a line of HUD text */
+  if(segs[forkAt]) segs[forkAt].sprites.push({x:0, kind:'split'});
   trackLen=segs.length*SEG;
 
   /* roadside props and traffic */
   for(let i=30;i<segs.length-30;i++){
+    /* while the road is splitting, the verge has moved outwards — planting a
+       palm at its old distance would put it in the middle of a lane */
+    const push0=segs[i].fork*1.25;
     if(i%9===0){
       const side=(R()<0.5?-1:1);
-      segs[i].sprites.push({x:side*(1.35+R()*1.4), kind:theme.props[R()<0.82?0:1]});
+      segs[i].sprites.push({x:side*(1.35+push0+R()*1.4), kind:theme.props[R()<0.82?0:1]});
     }
     if(i%4===0 && R()<0.25){
-      segs[i].sprites.push({x:(R()<0.5?-1:1)*(2.6+R()*2.2), kind:theme.props[0]});
+      segs[i].sprites.push({x:(R()<0.5?-1:1)*(2.6+push0+R()*2.2), kind:theme.props[0]});
     }
   }
   const traffic=26+row*6;
   for(let i=0;i<traffic;i++){
     const z=(60+R()*(segs.length-160))*SEG;
-    cars.push({z, x:(R()*2-1)*0.72, speed:MAXSPD*(0.35+R()*0.35), col:CARCOL[Math.floor(R()*CARCOL.length)]});
+    const x=(R()*2-1)*0.72;
+    cars.push({z, x, br:(x>=0?1:-1), speed:MAXSPD*(0.35+R()*0.35),
+               col:CARCOL[Math.floor(R()*CARCOL.length)], brake:0});
   }
+}
+/* The one definition of what a splitting road looks like, used by the
+   renderer, by the off-road test and by the traffic — so what you see and
+   what the car collides with can never drift apart.
+   Each carriageway narrows and slides outwards; the island opens between
+   them once the offset has overtaken the width. */
+const FORK_OFF=1.05, FORK_NARROW=0.45;
+function forkOff(f){ return f*FORK_OFF; }
+function forkHW(f){ return 1-FORK_NARROW*f; }
+/* Where a traffic car actually sits once the road has begun to split: it
+   commits to one branch instead of floating over the island. */
+function carX(c,fk){
+  if(!fk) return c.x;
+  return c.x*forkHW(fk) + c.br*forkOff(fk);
 }
 const CARCOL=['#3a6ad0','#d0c040','#40b060','#d06030','#c0c0d0','#a040a0'];
 
@@ -403,6 +430,10 @@ const MAXSPD=SEG*62;
 let cars=[];
 let pos=0, playerX=0, speed=0, gearHi=true, offRoad=false;
 let timeLeft=80, score=0, distance=0, bumpT=0, skidT=0;
+/* crashT drives the whole visible reaction to a hit: shake, spin, smoke and
+   a moment of vague steering. dirtT keeps the off-road warning from flashing
+   every frame while two wheels are in the sand. */
+let crashT=0, crashDir=0, dirtT=0, smoke=[];
 let state='title', phaseT=0, perf=0, last=0, msg='', msgT=0, endGoal='';
 let hi=parseInt(safeLS('costa_hi')||'0',10)||0;
 let localScores=[]; try{ localScores=JSON.parse(safeLS('costa_scores')||'[]')||[]; }catch(e){ localScores=[]; }
@@ -411,10 +442,19 @@ let overlayOpen=false, inputLock=0, paused=false;
 let forkChoice=0;
 
 function say(t){ msg=t; msgT=2.2; }
+/* tyre smoke, drawn over the player car after a hit */
+function spawnSmoke(){
+  for(let i=0;i<14;i++){
+    smoke.push({x:(Math.random()*2-1)*64, y:(Math.random()*2-1)*10,
+                vx:(Math.random()*2-1)*70, vy:-20-Math.random()*40,
+                r:5+Math.random()*7, t:0.5+Math.random()*0.5, life:1});
+  }
+}
 function startRun(){
   stageRow=0; stagePos=0; score=0; timeLeft=80; distance=0;
   cars=[]; buildStage(0,0);
   pos=0; playerX=0; speed=0; gearHi=false;
+  crashT=0; dirtT=0; smoke=[]; bumpT=0; skidT=0;
   state='ready'; phaseT=0;
   engineOn(); startMusic();
 }
@@ -429,6 +469,7 @@ function nextStage(){
   timeLeft+=42+stageRow*4;
   cars=[]; buildStage(stageRow,stagePos);
   pos=0; playerX=0;
+  crashT=0; dirtT=0; smoke=[];
   say(T('checkpoint')); sfx.check();
   state='ready'; phaseT=0;
 }
@@ -507,6 +548,12 @@ function update(dt){
   if(msgT>0) msgT-=dt;
   if(bumpT>0) bumpT-=dt;
   if(skidT>0) skidT-=dt;
+  if(crashT>0) crashT-=dt;
+  if(dirtT>0) dirtT-=dt;
+  for(let i=smoke.length-1;i>=0;i--){
+    const s=smoke[i]; s.t-=dt; s.x+=s.vx*dt; s.y+=s.vy*dt; s.r+=26*dt;
+    if(s.t<=0) smoke.splice(i,1);
+  }
   applyKeys();
 
   if(state==='ready'){ phaseT+=dt; engineSet(0.2,true);
@@ -526,25 +573,53 @@ function update(dt){
   /* steering, and the road pulling you outwards on a bend */
   const sp=speed/MAXSPD;
   const steer=(ctl.right?1:0)-(ctl.left?1:0);
-  playerX += steer*dt*2.4*sp;
+  /* a fresh hit costs you some of your steering for a moment — that is what
+     makes a crash feel like a crash rather than an invisible brake */
+  const grip=crashT>0? 0.45+0.55*(1-Math.min(1,crashT/0.7)) : 1;
+  playerX += steer*dt*2.4*sp*grip;
   playerX -= seg.curve*dt*sp*sp*0.55;
+  /* the slew after a hit pushes you toward the verge, but it stops at the
+     edge — one clip should not fling you into the sand on its own */
+  if(crashT>0 && Math.abs(playerX)<0.88) playerX += crashDir*dt*1.05*Math.min(1,crashT/0.7);
   playerX=clamp(playerX,-2.6,2.6);
 
-  offRoad=Math.abs(playerX)>1.02;
+  /* Off-road, fork-aware. While the road is split the tarmac is two ribbons
+     around a central island, so the middle counts as off-road too — without
+     this the car braked in the gap for no visible reason. */
+  const fk=seg.fork||0;
+  if(fk>0.02){
+    const side=playerX>=0?1:-1;
+    offRoad=Math.abs(playerX-side*forkOff(fk))>forkHW(fk)+0.06;
+  }else{
+    offRoad=Math.abs(playerX)>1.02;
+  }
   if(offRoad){
-    if(speed>MAXSPD*0.42){ speed-=MAXSPD*0.9*dt; if(skidT<=0){ sfx.skid(); skidT=0.3; } }
+    if(speed>MAXSPD*0.42){ speed-=MAXSPD*0.75*dt; if(skidT<=0){ sfx.skid(); skidT=0.3; } }
     else speed=Math.min(speed,MAXSPD*0.42);
+    if(dirtT<=0 && speed>MAXSPD*0.3){ say(T('dirt')); dirtT=1.6; }
   }
 
-  /* traffic */
+  /* Traffic. The contact box is now the width the car is actually drawn
+     (±0.15 of the road half-width plus a little), not half the road, and a
+     hit drops you to the pace of the car you hit instead of to a standstill. */
   for(const c of cars){
     c.z+=c.speed*dt;
     if(c.z>segs.length*SEG) c.z-=segs.length*SEG;
+    if(c.brake>0) c.brake-=dt;
+    const cseg=findSeg(c.z);
+    const cx=carX(c,(cseg&&cseg.fork)||0);
     const dz=c.z-pos;
-    if(dz>0 && dz<SEG*2.2 && Math.abs(c.x-playerX)<0.62 && speed>c.speed*0.4){
-      speed=Math.min(speed,c.speed*0.35);
-      playerX += (playerX>c.x?1:-1)*0.42;
-      if(bumpT<=0){ sfx.bump(); bumpT=0.6; }
+    const near=(dz>-SEG*0.5 && dz<SEG*1.5);
+    if(near && crashT<=0.5 && Math.abs(cx-playerX)<0.34 && speed>c.speed*0.9){
+      speed=Math.max(c.speed*0.82, speed*0.45);
+      crashDir = (playerX>=cx? 1:-1);
+      crashT=0.85;
+      playerX += crashDir*0.12;
+      spawnSmoke();
+      if(bumpT<=0){ sfx.bump(); bumpT=0.6; say(T('bump')); }
+    }else if(dz>0 && dz<SEG*7 && Math.abs(cx-playerX)<0.34 && speed>c.speed*1.05){
+      /* you are closing on it — light up its brake lights as a warning */
+      c.brake=0.2;
     }
   }
 
@@ -557,7 +632,7 @@ function update(dt){
   if(timeLeft<=0){ timeLeft=0; timeUp(); return; }
 
   /* which side of the fork are you on when the split ends */
-  if(segs[Math.floor(pos/SEG)] && segs[Math.floor(pos/SEG)].fork>0.2)
+  if(segs[Math.floor(pos/SEG)] && segs[Math.floor(pos/SEG)].fork>0.2 && Math.abs(playerX)>0.15)
     forkChoice = playerX>0? 1:0;
 
   if(pos>=trackLen-SEG*3){ nextStage(); }
@@ -611,11 +686,32 @@ function drawRoad(){
     const p1=s.p1.screen, p2=s.p2.screen;
     X.fillStyle=grass; X.fillRect(0,p2.y,W,p1.y-p2.y+1);
     if(s.fork>0){
-      const off=s.fork*p1.w*1.25, off2=s.fork*p2.w*1.25;
-      poly(p1.x-off,p1.y,p1.w*1.05,p2.x-off2,p2.y,p2.w*1.05,rum);
-      poly(p1.x-off,p1.y,p1.w*0.92,p2.x-off2,p2.y,p2.w*0.92,road);
-      poly(p1.x+off,p1.y,p1.w*1.05,p2.x+off2,p2.y,p2.w*1.05,rum);
-      poly(p1.x+off,p1.y,p1.w*0.92,p2.x+off2,p2.y,p2.w*0.92,road);
+      /* Two carriageways peeling apart around an island. The island is drawn
+         from the inner edges of the two roads, so it grows out of the tarmac
+         as a wedge instead of the road simply going see-through. */
+      const f=s.fork;
+      const off=forkOff(f)*p1.w, off2=forkOff(f)*p2.w;
+      const hw1=forkHW(f)*p1.w,  hw2=forkHW(f)*p2.w;
+      /* Both rumbles first, then both carriageways: while the two roads still
+         overlap the tarmac hides the inner kerbs, so the split grows out of
+         one road instead of a red stripe appearing down the middle of it. */
+      poly(p1.x-off,p1.y,hw1*1.12,p2.x-off2,p2.y,hw2*1.12,rum);
+      poly(p1.x+off,p1.y,hw1*1.12,p2.x+off2,p2.y,hw2*1.12,rum);
+      poly(p1.x-off,p1.y,hw1,p2.x-off2,p2.y,hw2,road);
+      poly(p1.x+off,p1.y,hw1,p2.x+off2,p2.y,hw2,road);
+      /* a centre line on each carriageway once they read as separate roads */
+      if(dark && f>0.45){
+        poly(p1.x-off,p1.y,hw1*0.03,p2.x-off2,p2.y,hw2*0.03,'#e8e8f0');
+        poly(p1.x+off,p1.y,hw1*0.03,p2.x+off2,p2.y,hw2*0.03,'#e8e8f0');
+      }
+      /* the island, drawn from the inner kerbs once they have actually parted */
+      const gR1=p1.x+off-hw1*1.12, gL1=p1.x-off+hw1*1.12;
+      const gR2=p2.x+off2-hw2*1.12, gL2=p2.x-off2+hw2*1.12;
+      if(gR1>gL1+1 && gR2>gL2+1){
+        const c1=(gL1+gR1)/2, w1=(gR1-gL1)/2;
+        const c2=(gL2+gR2)/2, w2=(gR2-gL2)/2;
+        poly(c1,p1.y,w1,c2,p2.y,w2,grass);
+      }
     }else{
       poly(p1.x,p1.y,p1.w*1.12,p2.x,p2.y,p2.w*1.12,rum);
       poly(p1.x,p1.y,p1.w,p2.x,p2.y,p2.w,road);
@@ -649,8 +745,27 @@ function drawSprite(s,offX,kind){
   /* Size everything against the projected road half-width. Deriving it from
      the raw scale instead silently shrank every palm to under a pixel. */
   const x=p.x+p.w*offX, y=p.y;
-  const hgt=p.w*(kind==='sign'?0.42:0.95);
+  const hgt=p.w*(kind==='sign'?0.42:(kind==='split'?0.60:0.95));
   if(hgt<1.5||hgt>H*3) return;
+  if(kind==='split'){
+    /* chevron board on the nose of the island, with the two arrows */
+    const bw=hgt*1.5, bh=hgt*0.42, by=y-hgt;
+    X.fillStyle='#6a6a72'; X.fillRect(x-hgt*0.03,by+bh,hgt*0.06,hgt-bh);
+    X.fillStyle='#181820'; X.fillRect(x-bw/2-2,by-2,bw+4,bh+4);
+    X.fillStyle='#ffd23b'; X.fillRect(x-bw/2,by,bw,bh);
+    X.fillStyle='#181820';
+    const n=Math.max(3,Math.round(bw/(bh*0.55)));
+    for(let i=0;i<n;i++){
+      const cx=x-bw/2+bw*(i+0.5)/n, d=bh*0.30;
+      const s2=i<n/2?-1:1;
+      X.beginPath();
+      X.moveTo(cx-d*s2,by+bh*0.16); X.lineTo(cx+d*s2,by+bh*0.5);
+      X.lineTo(cx-d*s2,by+bh*0.84); X.lineTo(cx-d*s2*0.35,by+bh*0.84);
+      X.lineTo(cx+d*s2*0.45,by+bh*0.5); X.lineTo(cx-d*s2*0.35,by+bh*0.16);
+      X.closePath(); X.fill();
+    }
+    return;
+  }
   if(kind==='palm'){
     X.fillStyle='#6a4a28'; X.fillRect(x-hgt*0.05,y-hgt,hgt*0.10,hgt);
     X.fillStyle='#2f7a3a';
@@ -685,7 +800,7 @@ function drawCar(s,c){
   const p=s.p1.screen; if(!p||p.scale<=0||!p.w) return;
   const wdt=p.w*0.30, hgt=wdt*0.62;
   if(wdt<2||wdt>W*1.6) return;
-  const x=p.x+p.w*c.x, y=p.y;
+  const x=p.x+p.w*carX(c,s.fork||0), y=p.y;
   X.fillStyle='rgba(0,0,0,.3)';
   X.beginPath(); X.ellipse(x,y,wdt*0.6,hgt*0.22,0,0,TAU); X.fill();
   X.fillStyle=c.col; X.fillRect(x-wdt/2,y-hgt,wdt,hgt*0.78);
@@ -693,14 +808,33 @@ function drawCar(s,c){
   X.fillStyle='#2a2a30';
   X.fillRect(x-wdt*0.54,y-hgt*0.3,wdt*0.16,hgt*0.34);
   X.fillRect(x+wdt*0.38,y-hgt*0.3,wdt*0.16,hgt*0.34);
-  X.fillStyle='#ff6a4a';
+  /* brake lights: dull normally, bright while you are closing on this car,
+     which is the warning that used to be missing entirely */
+  X.fillStyle=c.brake>0? '#ff2a10':'#ff6a4a';
   X.fillRect(x-wdt*0.42,y-hgt*0.66,wdt*0.16,hgt*0.16);
   X.fillRect(x+wdt*0.26,y-hgt*0.66,wdt*0.16,hgt*0.16);
+  if(c.brake>0 && wdt>10){
+    X.fillStyle='rgba(255,60,30,.28)';
+    X.beginPath(); X.arc(x-wdt*0.34,y-hgt*0.58,wdt*0.22,0,TAU); X.fill();
+    X.beginPath(); X.arc(x+wdt*0.34,y-hgt*0.58,wdt*0.22,0,TAU); X.fill();
+  }
 }
 function drawPlayerCar(){
-  const bob=Math.sin(perf/90)*(speed/MAXSPD)*1.6 + (bumpT>0?Math.sin(perf/22)*3:0);
-  const x=W/2 + (ctl.left?-6:0) + (ctl.right?6:0), y=H-58+bob;
+  const cw=crashT>0? Math.min(1,crashT/0.85) : 0;
+  const bob=Math.sin(perf/90)*(speed/MAXSPD)*1.6 + (bumpT>0?Math.sin(perf/22)*3:0)
+            + (cw?Math.sin(perf/18)*5*cw:0);
+  const x=W/2 + (ctl.left?-6:0) + (ctl.right?6:0)
+          + (cw? Math.sin(perf/26)*22*cw*crashDir : 0);
+  const y=H-58+bob;
   const w=132, h=44;
+  /* tyre smoke sits behind the car, at wheel height */
+  for(const s of smoke){
+    X.fillStyle='rgba(228,224,220,'+(0.40*Math.max(0,s.t)).toFixed(3)+')';
+    X.beginPath(); X.arc(W/2+s.x, H-30+s.y, s.r, 0, TAU); X.fill();
+  }
+  /* the car slews after a hit — you can see what happened to you */
+  X.save();
+  if(cw){ X.translate(x,y); X.rotate(Math.sin(perf/24)*0.10*cw*crashDir); X.translate(-x,-y); }
   X.fillStyle='rgba(0,0,0,.35)';
   X.beginPath(); X.ellipse(x,y+22,w*0.52,9,0,0,TAU); X.fill();
   /* body */
@@ -724,6 +858,7 @@ function drawPlayerCar(){
     for(let i=0;i<5;i++) X.beginPath(),
       X.arc(x-w*0.5+Math.random()*w, y+18+Math.random()*10, 3+Math.random()*4,0,TAU), X.fill();
   }
+  X.restore();
 }
 
 /* ---------------- HUD ---------------- */
@@ -745,17 +880,26 @@ function drawHUD(){
 function render(){
   if(state==='title'){ drawTitle(); return; }
   if(state==='radio'){ drawRadio(); return; }
+  /* a short shake on impact — the world moves, not just the number */
+  const shake = crashT>0? Math.min(1,crashT/0.85) : 0;
+  X.save();
+  if(shake) X.translate(Math.sin(perf/13)*7*shake, Math.cos(perf/11)*4*shake);
   drawRoad();
   drawPlayerCar();
+  X.restore();
   drawHUD();
   if(state==='ready'){
     dim(0.34);
     shadowText(theme.name+'  —  '+T('stage')+' '+(stageRow+1),W/2,H/2-24,24,'#ffd9a0');
     if(phaseT>1.1) shadowText(T('go'),W/2,H/2+22,32,'#8ef0a0');
   }
-  if(state==='drive' && segs[Math.floor(pos/SEG)] && segs[Math.floor(pos/SEG)].fork>0.15
+  if(state==='drive' && segs[Math.floor(pos/SEG)] && segs[Math.floor(pos/SEG)].fork>0.04
      && stageRow<ROWS-1){
-    shadowText(T('fork'),W/2,160,20,'#ffd23b');
+    shadowText(T('fork'),W/2,150,20,'#ffd23b');
+    /* which way each side takes you, so the choice is not blind */
+    const blink=Math.floor(perf/380)%2===0;
+    shadowText('◀ '+T('keepleft'), W/2-118,176,14, blink?'#ffffff':'#ffd23b');
+    shadowText(T('keepright')+' ▶',W/2+118,176,14, blink?'#ffd23b':'#ffffff');
   }
   if(paused){ dim(0.5); shadowText(T('pause'),W/2,H/2,28,'#ffd23b'); }
   if(state==='over'){ dim(0.62); drawEnd(T('timeup'),'#ff5a3a'); }
@@ -968,6 +1112,8 @@ window.__game={
   get cars(){return cars;}, get radio(){return radio;}, set radio(v){radio=v;},
   get boardState(){return boardState;}, get touchOnly(){return touchOnly;},
   get endGoal(){return endGoal;}, get offRoad(){return offRoad;},
+  get crashT(){return crashT;}, get forkAt(){return forkAt;}, get forkChoice(){return forkChoice;},
+  get segFork(){const s=segs[Math.floor(pos/SEG)]; return s? s.fork:0;}, carX,
   get lang(){return lang;}, setLang:l=>{lang=l;syncChrome();},
   ctl, T, TUNES, GOALS
 };
