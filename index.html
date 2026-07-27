@@ -322,7 +322,9 @@ function toggleMute(){
 }
 
 /* ---------------- the road ---------------- */
-const SEG=200, ROADW=2000, LANES=3, DRAW=260, CAMH=1100, FOV=100;
+const SEG=200, ROADW=2000, LANES=3, DRAW=340, CAMH=1100, FOV=100;
+/* segments drawn past the finish line so the split runs to the horizon */
+const TAIL=DRAW+60;
 const CAMD=1/Math.tan((FOV/2)*Math.PI/180);
 let segs=[];
 
@@ -386,13 +388,24 @@ function buildStage(row,pos){
   /* the sign board that stands on the nose of the island, so the split is
      announced by the scenery and not only by a line of HUD text */
   if(segs[forkAt]) segs[forkAt].sprites.push({x:0, kind:'split'});
+  /* The stage ends here — everything after this point is only scenery. */
   trackLen=segs.length*SEG;
+  /* A tail nobody drives. Without it the road simply stopped existing a
+     couple of hundred metres past the split, so the two carriageways looked
+     cut off and the checkpoint felt like the end of the tarmac. Here they
+     carry on over a crest and away to the horizon, drifting further apart,
+     which is what makes them read as two roads going to two places. */
+  for(let i=0;i<TAIL;i++){
+    const k=i/TAIL;
+    push(Math.sin(k*Math.PI*1.6)*hard*1.4, Math.sin(k*Math.PI*2)*30*(0.5+row*0.12));
+    segs[segs.length-1].fork=1+k*0.8;
+  }
 
   /* roadside props and traffic */
   for(let i=30;i<segs.length-30;i++){
     /* while the road is splitting, the verge has moved outwards — planting a
        palm at its old distance would put it in the middle of a lane */
-    const push0=segs[i].fork*1.25;
+    const push0=forkOff(segs[i].fork);
     if(i%9===0){
       const side=(R()<0.5?-1:1);
       segs[i].sprites.push({x:side*(1.35+push0+R()*1.4), kind:theme.props[R()<0.82?0:1]});
@@ -403,7 +416,7 @@ function buildStage(row,pos){
   }
   const traffic=26+row*6;
   for(let i=0;i<traffic;i++){
-    const z=(60+R()*(segs.length-160))*SEG;
+    const z=(60+R()*(total-160))*SEG;
     const x=(R()*2-1)*0.72;
     cars.push({z, x, br:(x>=0?1:-1), speed:MAXSPD*(0.35+R()*0.35),
                col:CARCOL[Math.floor(R()*CARCOL.length)], brake:0});
@@ -416,7 +429,7 @@ function buildStage(row,pos){
    them once the offset has overtaken the width. */
 const FORK_OFF=1.05, FORK_NARROW=0.45;
 function forkOff(f){ return f*FORK_OFF; }
-function forkHW(f){ return 1-FORK_NARROW*f; }
+function forkHW(f){ return 1-FORK_NARROW*Math.min(f,1); }
 /* Where a traffic car actually sits once the road has begun to split: it
    commits to one branch instead of floating over the island. */
 function carX(c,fk){
@@ -604,7 +617,7 @@ function update(dt){
      hit drops you to the pace of the car you hit instead of to a standstill. */
   for(const c of cars){
     c.z+=c.speed*dt;
-    if(c.z>segs.length*SEG) c.z-=segs.length*SEG;
+    if(c.z>trackLen) c.z-=trackLen;
     if(c.brake>0) c.brake-=dt;
     const cseg=findSeg(c.z);
     const cx=carX(c,(cseg&&cseg.fork)||0);
@@ -635,7 +648,9 @@ function update(dt){
   if(segs[Math.floor(pos/SEG)] && segs[Math.floor(pos/SEG)].fork>0.2 && Math.abs(playerX)>0.15)
     forkChoice = playerX>0? 1:0;
 
-  if(pos>=trackLen-SEG*3){ nextStage(); }
+  /* Hand over to the next stage well before the drawn road runs out, so the
+     checkpoint happens with open road ahead instead of at a visible edge. */
+  if(pos>=trackLen-SEG*26){ nextStage(); }
 }
 
 /* ---------------- projection ---------------- */
@@ -893,8 +908,10 @@ function render(){
     shadowText(theme.name+'  —  '+T('stage')+' '+(stageRow+1),W/2,H/2-24,24,'#ffd9a0');
     if(phaseT>1.1) shadowText(T('go'),W/2,H/2+22,32,'#8ef0a0');
   }
-  if(state==='drive' && segs[Math.floor(pos/SEG)] && segs[Math.floor(pos/SEG)].fork>0.04
-     && stageRow<ROWS-1){
+  /* only while the choice is still open — once the roads are fully apart you
+     have committed, and the island and kerbs say the rest */
+  const fkNow = (segs[Math.floor(pos/SEG)]||{}).fork||0;
+  if(state==='drive' && fkNow>0.04 && fkNow<0.999 && stageRow<ROWS-1){
     shadowText(T('fork'),W/2,150,20,'#ffd23b');
     /* which way each side takes you, so the choice is not blind */
     const blink=Math.floor(perf/380)%2===0;

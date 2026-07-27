@@ -31,6 +31,11 @@ island, and `LEFT` / `RIGHT` on screen. As the two carriageways part, the
 island between them is real ground: drive onto it and you are off the road
 like anywhere else.
 
+The road does not stop at the checkpoint. Both carriageways carry on over a
+crest and away to the horizon, drifting further apart, and the handover to the
+next stage happens well before the drawn road runs out — so a checkpoint looks
+like a road going somewhere rather than the end of the tarmac.
+
 ## Controls
 
 `←` `→` steer, `↑` accelerate, `↓` brake, `SPACE` shifts between the low and
