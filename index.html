@@ -131,7 +131,7 @@ const STR={
       pause:'PAUSED',fork:'CHOOSE YOUR ROAD',
       bump:'CRASH!',dirt:'OFF THE ROAD!',keepleft:'LEFT',keepright:'RIGHT',
       sending:'SENDING…',sent:'SAVED ONLINE!',failed:'OFFLINE — SAVED LOCALLY',
-      offline:'OFFLINE — LOCAL SCORES ONLY',loading:'LOADING BOARD…',newrec:'NEW RECORD!',
+      offline:'OFFLINE — LOCAL SCORES ONLY',empty:'ONLINE BOARD IS EMPTY — BE THE FIRST!',loading:'LOADING BOARD…',newrec:'NEW RECORD!',
       rotate:'TURN THE PHONE SIDEWAYS',route:'ROUTE'},
   sl:{sub:'PETNAJST CEST, PET CILJEV',start:'PRITISNI ENTER  /  TAPNI ZA VOŽNJO',
       name:'TVOJE IME?',namehint:'PRIKAZANO NA LESTVICI',driver:'VOZNIK',chname:'N = SPREMENI IME',
@@ -145,7 +145,7 @@ const STR={
       pause:'PAVZA',fork:'IZBERI CESTO',
       bump:'TRČENJE!',dirt:'ZAPELJAL S CESTE!',keepleft:'LEVO',keepright:'DESNO',
       sending:'POŠILJAM…',sent:'SHRANJENO NA SPLETU!',failed:'BREZ POVEZAVE — SHRANJENO LOKALNO',
-      offline:'BREZ POVEZAVE — LE LOKALNI REZULTATI',loading:'NALAGAM LESTVICO…',newrec:'NOV REKORD!',
+      offline:'BREZ POVEZAVE — LE LOKALNI REZULTATI',empty:'SPLETNA LESTVICA JE PRAZNA — BODI PRVI!',loading:'NALAGAM LESTVICO…',newrec:'NOV REKORD!',
       rotate:'OBRNI TELEFON POLEŽE',route:'POT'},
   de:{sub:'FÜNFZEHN STRASSEN, FÜNF ZIELE',start:'ENTER DRÜCKEN  /  TIPPEN ZUM FAHREN',
       name:'DEIN NAME?',namehint:'ERSCHEINT IN DER BESTENLISTE',driver:'FAHRER',chname:'N = NAME ÄNDERN',
@@ -159,7 +159,7 @@ const STR={
       pause:'PAUSE',fork:'WÄHLE DEINE STRASSE',
       bump:'CRASH!',dirt:'NEBEN DER STRASSE!',keepleft:'LINKS',keepright:'RECHTS',
       sending:'SENDE…',sent:'ONLINE GESPEICHERT!',failed:'OFFLINE — LOKAL GESPEICHERT',
-      offline:'OFFLINE — NUR LOKALE PUNKTE',loading:'LADE BESTENLISTE…',newrec:'NEUER REKORD!',
+      offline:'OFFLINE — NUR LOKALE PUNKTE',empty:'ONLINE-TABELLE IST LEER — SEI DER ERSTE!',loading:'LADE BESTENLISTE…',newrec:'NEUER REKORD!',
       rotate:'DAS HANDY QUER DREHEN',route:'ROUTE'},
   it:{sub:'QUINDICI STRADE, CINQUE FINALI',start:'PREMI INVIO  /  TOCCA PER GUIDARE',
       name:'IL TUO NOME?',namehint:'MOSTRATO IN CLASSIFICA',driver:'PILOTA',chname:'N = CAMBIA NOME',
@@ -173,7 +173,7 @@ const STR={
       pause:'PAUSA',fork:'SCEGLI LA STRADA',
       bump:'SCONTRO!',dirt:'FUORI STRADA!',keepleft:'SIN.',keepright:'DES.',
       sending:'INVIO…',sent:'SALVATO ONLINE!',failed:'OFFLINE — SALVATO IN LOCALE',
-      offline:'OFFLINE — SOLO PUNTEGGI LOCALI',loading:'CARICO LA CLASSIFICA…',newrec:'NUOVO RECORD!',
+      offline:'OFFLINE — SOLO PUNTEGGI LOCALI',empty:'CLASSIFICA ONLINE VUOTA — SII IL PRIMO!',loading:'CARICO LA CLASSIFICA…',newrec:'NUOVO RECORD!',
       rotate:'GIRA IL TELEFONO DI LATO',route:'PERCORSO'},
   fr:{sub:'QUINZE ROUTES, CINQ FINS',start:'APPUIE SUR ENTRÉE  /  TOUCHE POUR ROULER',
       name:'TON NOM ?',namehint:'AFFICHÉ DANS LE CLASSEMENT',driver:'PILOTE',chname:'N = CHANGER DE NOM',
@@ -187,7 +187,7 @@ const STR={
       pause:'PAUSE',fork:'CHOISIS TA ROUTE',
       bump:'CHOC !',dirt:'HORS DE LA ROUTE !',keepleft:'GAUCHE',keepright:'DROITE',
       sending:'ENVOI…',sent:'ENREGISTRÉ EN LIGNE !',failed:'HORS LIGNE — ENREGISTRÉ EN LOCAL',
-      offline:'HORS LIGNE — SCORES LOCAUX',loading:'CHARGEMENT DU CLASSEMENT…',newrec:'NOUVEAU RECORD !',
+      offline:'HORS LIGNE — SCORES LOCAUX',empty:'CLASSEMENT EN LIGNE VIDE — SOIS LE PREMIER!',loading:'CHARGEMENT DU CLASSEMENT…',newrec:'NOUVEAU RECORD !',
       rotate:'TOURNE LE TÉLÉPHONE',route:'ROUTE'}
 };
 function detectLang(){
@@ -933,7 +933,9 @@ function drawEnd(title,col){
 }
 function drawBoard(top,rows){
   if(boardState==='loading'){ shadowText(T('loading'),W/2,top+18,12,'#ffd9a0'); return; }
-  const online=boardState==='ok'&&boardRows&&boardRows.length;
+  /* Connected is not the same as full: a board that answered and simply has
+     no scores in it yet is not offline. */
+  const online=boardState==='ok'&&!!boardRows;
   const list=online? boardRows.slice(0,rows):localScores.slice(0,rows);
   shadowText(T('board'),W/2,top,13,'#ffb060');
   X.fillStyle='rgba(255,176,96,.3)'; X.fillRect(W/2-150,top+11,300,1);
@@ -945,6 +947,7 @@ function drawBoard(top,rows){
     shadowText(String(h.s),W/2+140,y,12,'#ffd23b','right');
   });
   if(!online) shadowText(T('offline'),W/2,top+32+rows*18,9,'#ff9f6f');
+  else if(!list.length) shadowText(T('empty'),W/2,top+32+rows*18,9,'#8ef0a0');
 }
 function drawTitle(){
   const g=X.createLinearGradient(0,0,0,H);
